@@ -35,7 +35,9 @@ static void ir1_optimization_over_tb(TranslationBlock *tb)
     DEF_INSTS_PTN(ptn);
     /* check if need cross tb analyze */
     CHK_FLAG_RDTN(rdtn, tb);
+#ifdef CONFIG_LATX_FLAG_REDUCTION
     rdtn_pending_use &= tb->s_data->eflag_out;
+#endif
     /* scanning instructions in reverse order */
     for (int i = tb_ir1_num(tb) - 1; i >= 0; --i) {
         ir1 = tb_ir1_inst(tb, i);
@@ -104,7 +106,9 @@ void over_tb_rfd(TranslationBlock **tb_list, int tb_num)
             continue;
         }
         eflag_def[i] = __NONE;
+#ifdef CONFIG_LATX_FLAG_REDUCTION
         uint8 rdtn_pending_use = __ALL_EFLAGS;
+#endif
         for (int j = tb_ir1_num(tb) - 1; j >= 0; --j) {
             ir1 = tb_ir1_inst(tb, j);
             OPT_FLAG_RDTN(rdtn, ir1);
