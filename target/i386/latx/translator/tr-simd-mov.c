@@ -336,7 +336,9 @@ bool translate_movaps_vst_x4(IR1_INST *pir1)
 
     // save context
     tr_save_registers_to_env(0xff, 0x0, xmm & 0xff, 0);
+#ifdef TARGET_X86_64
     tr_save_x64_8_registers_to_env(0xff, (xmm >> 8) & 0xff);
+#endif
 
     // call helper
     la_mov64(a0_ir2_opnd, env_ir2_opnd);
@@ -358,7 +360,9 @@ bool translate_movaps_vst_x4(IR1_INST *pir1)
 
     // restore context
     tr_load_registers_from_env(0xff, 0x0, 0x0, 0);
+#ifdef TARGET_X86_64
     tr_load_x64_8_registers_from_env(0xff, 0x0);
+#endif
 
     // beq a0, finish
     la_beq(a0_ir2_opnd, zero_ir2_opnd, label_finish);
@@ -413,7 +417,9 @@ bool translate_movaps(IR1_INST *pir1)
             la_add_d(tmp, mem, tmp);
             // save context
             tr_save_registers_to_env(0xff, 0x0, 0x0, 0);
+#ifdef TARGET_X86_64
             tr_save_x64_8_registers_to_env(0xff, 0x0);
+#endif
             // call smc_store_helper
             la_mov64(a0_ir2_opnd, env_ir2_opnd);
             la_mov64(a1_ir2_opnd, tmp);
@@ -426,7 +432,9 @@ bool translate_movaps(IR1_INST *pir1)
             la_jirl(ra_ir2_opnd, tmp, 0);
             // restore context
             tr_load_registers_from_env(0xff, 0x0, 0x0, 0);
+#ifdef TARGET_X86_64
             tr_load_x64_8_registers_from_env(0xff, 0x0);
+#endif
             // beq a0, finish
             la_beq(a0_ir2_opnd, zero_ir2_opnd, label_finish);
             store_freg128_to_ir1_mem(ra_alloc_xmm(ir1_opnd_base_reg_num(src)),
