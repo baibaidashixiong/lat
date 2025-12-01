@@ -58,6 +58,52 @@ def isImmLoad(name = str):
     else:
         return False
 
+def isBstrInst(name = str):
+    bstr_inst_list = ["bstrins.w", "bstrins.d", "bstrpick.w", "bstrpick.d"]
+    if name in bstr_inst_list:
+        return True
+    else:
+        return False
+
+def isAmInst(name = str):
+    am_inst_list = ["amcas.b", "amcas.h", "amcas.w", "amcas.d", \
+            "amcas.db.b", "amcas.db.h", "amcas.db.w", "amcas.db.d", \
+            "amswap.w", "amswap.d", "amswap.db.w", "amswap.db.d", \
+            "amadd.w", "amadd.d", "amadd.db.w", "amadd.db.d", \
+            "amand.w", "amand.d", "amand.db.w", "amand.db.d", \
+            "amor.w", "amor.d", "amor.db.w", "amor.db.d", \
+            "amxor.w", "amxor.d", "amxor.db.w", "amxor.db.d", \
+            "ammax.w", "ammax.d", "ammax.db.w", "ammax.db.d", \
+            "ammin.w", "ammin.d", "ammin.db.w", "ammin.db.d", \
+            "ammax.wu", "ammax.du", "ammax.db.wu", "ammax.db.du", \
+            "ammin.wu", "ammin.du", "ammin.db.wu", "ammin.db.du", \
+            "amswap.b", "amswap.h", "amswap.db.b", "amswap.db.h", \
+            "amadd.b", "amadd.h", "amadd.db.b", "amadd.db.h"]
+    if name in am_inst_list:
+        return True
+    else:
+        return False
+
+def isCsrInst(name = str):
+    csr_inst_list = ["csrxchg", "gcsrxchg"]
+    if name in csr_inst_list:
+        return True
+    else:
+        return False
+
+def checkOpndConstraints(name = str, opnd = list):
+    if isBstrInst(name):
+        return "    lsassertm({} >= {}, BSTRINST);\n".format(opnd[2], opnd[3])
+    if isCsrInst(name):
+        return "    lsassertm((ir2_opnd_base_reg_num(&rj) != 0) &&\n" \
+             + "             (ir2_opnd_base_reg_num(&rj) != 1) ,CSRINST);\n"
+    if isAmInst(name):
+        return "    if(ir2_opnd_base_reg_num(&rd) != 0)\n" \
+             + "        lsassertm((ir2_opnd_base_reg_num(&rd) != ir2_opnd_base_reg_num(&rj)) &&\n" \
+             + "                  (ir2_opnd_base_reg_num(&rd) != ir2_opnd_base_reg_num(&rk)), AMINST);\n"
+
+    return ""
+
 def generatingCheck(name = str, opnd = str):
     if re.search("imm", opnd) and not isImmLoad(name):
         if re.search("si", opnd):
@@ -105,6 +151,8 @@ def generatingFunctionBody(name = str, opcode = str, opnd = list):
             returnstr += "    pir2->_opnd[{}] = {};\n".format(i, opnd[i].split("_")[-1])
         # Genatrate check code
         returnstr += generatingCheck(name, opnd[i])
+
+    returnstr += checkOpndConstraints(name, opnd)
 
     returnstr += "    return pir2;\n"
     return returnstr
@@ -302,6 +350,13 @@ def main():
     func_list.append('#include "reg-alloc.h"' + "\n")
     func_list.append('#include "latx-options.h"' + "\n")
     func_list.append('#include "qemu/bitops.h"' + "\n")
+
+    func_list.append("\n" + '#define AMINST ')
+    func_list.append('"\\nError: atomic memory operations insns require rd != rj && rd != rk when rd isn\'t r0\\n"')
+    func_list.append("\n" + '#define CSRINST ')
+    func_list.append('"\\nError: g?csrxchg require rj != r0 && rj != r1\\n"')
+    func_list.append("\n" + '#define BSTRINST ')
+    func_list.append('"\\nError: bstr(ins|pick).[wd] require msbd >= lsbd\\n"' + "\n\n")
 
     header_list.append(annotation_str + "\n")
     header_list.append("#ifndef _LA_APPEND_H_" + "\n")
