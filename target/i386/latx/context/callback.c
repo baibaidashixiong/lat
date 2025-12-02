@@ -78,6 +78,7 @@ uint64_t RunFunctionWithState(uintptr_t fnc, int nargs, ...)
     memcpy(&cs->jmp_env, &buf, sizeof(sigjmp_buf));
     cpu->eip = oldip;
 
+    cpu->regs[R_ESP] += stackn*sizeof(void*);
     cpu->regs[R_R15] = Pop64(cpu);
     cpu->regs[R_R14] = Pop64(cpu);
     cpu->regs[R_R13] = Pop64(cpu);
