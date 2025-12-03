@@ -82,7 +82,6 @@ EXPORT void* my_eglGetProcAddress(void* name)
 
 #define CUSTOM_INIT                 \
     getMy(lib);                     \
-    setNeededLibs(lib, 1, "libGL.so.1");\
     if (!box64->glxprocaddress)     \
         box64->glxprocaddress = (procaddess_t)my->eglGetProcAddress;
 
