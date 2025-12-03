@@ -1370,6 +1370,12 @@ void iFEpUup(uintptr_t fcn);
 void iFEpuppp(uintptr_t fcn);
 void iFEpuvvppp(uintptr_t fcn);
 void iFEpUUuppp(uintptr_t fcn);
+void vFpupppppppppp(uintptr_t fnc);
+void pFpuppu(uintptr_t fnc);
+void pFpupuup(uintptr_t fnc);
+void pFpupppppppppppppppp(uintptr_t fnc);
+void pFpupupppppppppppppppp(uintptr_t fnc);
+void pFpupuupppppppppppppppppppp(uintptr_t fnc);
 //endvulkan
 //xcbV2
 void pFb(uintptr_t fcn);
