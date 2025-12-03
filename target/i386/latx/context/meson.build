@@ -2,6 +2,8 @@ latx_new_world = 'CONFIG_LOONGARCH_NEW_WORLD' in config_host
 my_file = files(
   'wrappedvulkan.c',
   'wrappedwaylandclient.c',
+  'wrappedwaylandegl.c',
+  'wrappedwaylandcursor.c',
   'wrappedlibc.c',
   'wrappedlibvadrm.c',
   'wrappedlibva.c',
