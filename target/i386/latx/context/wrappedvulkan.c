@@ -818,11 +818,12 @@ EXPORT int32_t my_vkGetPhysicalDeviceSurfaceSupportKHR(void* physicalDevice, uin
     if (icd_surface->platform == VK_ICD_WSI_PLATFORM_XCB) {//only sync xcb platform ,xlib skip, other assert
         sync_xcb_connection(((my_VkIcdSurfaceXcb_s *)icd_surface)->connection);
     } else if(icd_surface->platform == VK_ICD_WSI_PLATFORM_WAYLAND){
-        // TODO: report not support for wayland surface, need fix when wayland support complete.
-        *((uint32_t*)pSupported) = 0;
-    } else if (icd_surface->platform != VK_ICD_WSI_PLATFORM_XLIB) {
+        // Wayland support enabled
+    } else if (icd_surface->platform == VK_ICD_WSI_PLATFORM_XLIB) {
+        // Xlib support enabled
+    } else
         lsassertm(0, "error surface platform is %d\n", icd_surface->platform);
-    }
+
     return ret;
 }
 

@@ -35,6 +35,8 @@ static void freeMy(void)
     #endif
 }
 
+#define HAS_MY
+
 #ifndef ADDED_SUPER
 #undef SUPER
 #endif
