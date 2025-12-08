@@ -1,9 +1,9 @@
 ===========
-LATX (Loongson Architecture Translator for x86)
+LATX (LoongArch Architecture Translator for x86)
 ===========
 
-LATX（Loongson Architecture Translator for x86）即龙芯 x86 架构转译器，是
-一个面向 LoongArch 架构的高性能用户级二进制翻译器，用于在龙芯（龙架构）系
+LATX（LoongArch Architecture Translator for x86）即龙芯 x86 架构转译器，是
+一个面向 LoongArch 架构的高性能用户级二进制翻译器，用于在龙架构系
 统上高效地运行 32/64 位 x86 应用程序。
 
 LATX 基于 QEMU 6 版本开发并进行了深度优化，性能相比原生 QEMU 有显著提升。

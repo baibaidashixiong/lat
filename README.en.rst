@@ -1,11 +1,11 @@
 ===========
-LATX (Loongson Architecture Translator for x86)
+LATX (LoongArch Architecture Translator for x86)
 ===========
 
-LATX (Loongson Architecture Translator for x86) is a high-performance
+LATX (LoongArch Architecture Translator for x86) is a high-performance
 user-level binary translator designed specifically for the LoongArch
 architecture, enabling efficient execution of x86 applications on 
-Loongson-based systems.
+LoongArch-based systems.
 
 Built upon QEMU 6 with substantial optimizations, LATX significantly
 outperforms the original QEMU implementation.
