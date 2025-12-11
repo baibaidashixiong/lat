@@ -1,5 +1,5 @@
-project('latx', ['c'], meson_version: '>=0.55.0',
-        default_options: ['warning_level=1', 'c_std=gnu99', 'cpp_std=gnu++11', 'b_colorout=auto'] +
+project('latx', ['c','cpp'], meson_version: '>=0.55.0',
+        default_options: ['warning_level=1', 'c_std=gnu99', 'cpp_std=gnu++17', 'b_colorout=auto'] +
                          (meson.version().version_compare('>=0.56.0') ? [ 'b_staticpic=false' ] : []),
         version: run_command('head', meson.source_root() / 'VERSION').stdout().strip())
 
@@ -49,6 +49,9 @@ add_global_arguments(config_host['QEMU_CXXFLAGS'].split(),
                      native: false, language: 'cpp')
 add_global_link_arguments(config_host['QEMU_LDFLAGS'].split(),
                           native: false, language: ['c', 'cpp', 'objc'])
+
+tracy_inc = include_directories('tracy/public')
+add_project_arguments('-DTRACY_ENABLE', language: ['c', 'cpp'])
 
 add_project_arguments('-isystem', meson.current_source_dir() / 'linux-headers',
                       '-isystem', 'linux-headers',

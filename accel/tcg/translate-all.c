@@ -63,6 +63,7 @@
 #include "hw/core/tcg-cpu-ops.h"
 #include "internal.h"
 #include "loongarch-extcontext.h"
+#include "tracy/public/tracy/TracyC.h"
 
 #ifdef CONFIG_LATX_PERF
 #include "latx-perf.h"

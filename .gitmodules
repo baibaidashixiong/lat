@@ -1,3 +1,6 @@
 [submodule "meson"]
 	path = meson
 	url = https://gitlab.com/qemu-project/meson.git
+[submodule "tracy"]
+	path = tracy
+	url = https://github.com/wolfpld/tracy.git

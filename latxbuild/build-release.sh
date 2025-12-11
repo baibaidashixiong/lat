@@ -19,7 +19,7 @@ build() {
     unset CXXFLAGS
     unset CFLAGS
     unset LDFLAGS
-    export CFLAGS="-Wno-error=unused-but-set-variable -Wno-error=unused-function -Wformat -Werror=format-y2k"
+    export CFLAGS="-g -Wno-error=unused-but-set-variable -Wno-error=unused-function -Wformat -Werror=format-y2k"
 
     local _configure32_flags=(
         --target-list=i386-linux-user
@@ -69,12 +69,13 @@ build() {
         --enable-latx
         --extra-ldflags=-ldl
         --optimize-O1
+        --enable-debug
     )
 
-    pushd $srcdir/build32 >/dev/null
-    ../configure "${_configure32_flags[@]}"
-    ninja -j$(nproc)
-    popd >/dev/null
+    #pushd $srcdir/build32 >/dev/null
+    #../configure "${_configure32_flags[@]}"
+    #ninja -j$(nproc)
+    #popd >/dev/null
 
     pushd $srcdir/build64 >/dev/null
     ../configure "${_configure64_flags[@]}"

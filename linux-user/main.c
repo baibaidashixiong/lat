@@ -49,6 +49,7 @@
 #include "target_elf.h"
 #include "cpu_loop-common.h"
 #include "crypto/init.h"
+#include "tracy/public/tracy/TracyC.h"
 int mydebug = 1;
 
 #ifdef CONFIG_LATX
@@ -1538,7 +1539,13 @@ int main(int argc, char **argv, char **envp)
 #ifdef CONFIG_LATX_PERF
     latx_timer_start(TIMER_PROCESS);
 #endif
+    TracyCZone(main_ctx, 1);
+    TracyCZoneName(main_ctx, "Main Loop Pass", 14);
+
     cpu_loop(env);
+    TracyCZoneEnd(main_ctx);
+    TracyCFrameMark;
+
     /* never exits */
     return 0;
 }

@@ -1088,6 +1088,8 @@ static inline void cpu_loop_exec_tb(CPUState *cpu, TranslationBlock *tb,
 /* main execution loop */
 int cpu_exec(CPUState *cpu)
 {
+    TracyCZone(exec_ctx, 1);
+    TracyCZoneName(exec_ctx, "Exec Loop Pass", 14);
     CPUClass *cc = CPU_GET_CLASS(cpu);
     int ret;
     SyncClocks sc = { 0 };
@@ -1182,6 +1184,8 @@ int cpu_exec(CPUState *cpu)
             align_clocks(&sc, cpu);
         }
     }
+    TracyCZoneEnd(exec_ctx);
+    TracyCFrameMark;
 
     cpu_exec_exit(cpu);
     rcu_read_unlock();

@@ -5,6 +5,7 @@
 #include "qemu/rcu.h"
 #include "qemu/log.h"
 #include "error.h"
+#include "tracy/public/tracy/TracyC.h"
 
 typedef struct box64context_s box64context_t;
 extern int relocation_log;    // log level
