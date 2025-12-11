@@ -1478,6 +1478,7 @@ void pFbpCpppwwwwwwWW(uintptr_t fcn);
 void uFbuuWW(uintptr_t fcn);
 void uFbuuiup(uintptr_t fcn);
 void fFbu(uintptr_t fcn);
+void pFiiu(uintptr_t fcn);
 void pFbuuUUU(uintptr_t fcn);
 void pFbuuuuuwwuuuuUUUup(uintptr_t fcn);
 //endxcbV2
