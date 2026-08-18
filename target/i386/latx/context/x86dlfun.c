@@ -23,13 +23,16 @@ int init_x86dlfun_from(const char *primary, const char *fallback)
     elfheader_t *header = loadElfFromFile(primary);
     int resolved_count = 0;
 
-    lsassert(header);
-    ResetSpecialCaseElf(header, symbols, X86_DL_SYMBOL_COUNT,
-                        resolved, &resolved_count);
-    if (resolved_count != X86_DL_SYMBOL_COUNT) {
-        header = loadElfFromFile(fallback);
+    if (header) {
         ResetSpecialCaseElf(header, symbols, X86_DL_SYMBOL_COUNT,
                             resolved, &resolved_count);
+    }
+    if (resolved_count != X86_DL_SYMBOL_COUNT) {
+        header = loadElfFromFile(fallback);
+        if (header) {
+            ResetSpecialCaseElf(header, symbols, X86_DL_SYMBOL_COUNT,
+                                resolved, &resolved_count);
+        }
     }
     lsassert(resolved_count == X86_DL_SYMBOL_COUNT);
 

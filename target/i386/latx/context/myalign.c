@@ -3230,24 +3230,69 @@ void kzt_wine_init_x86(void)
     x86realloc = m->reallocp;
 }
 
-elfheader_t* loadElfFromFile(const char* name)
+#ifdef CONFIG_LATX_KZT
+static elfheader_t *find_loaded_elf(const char *name)
 {
-    elfheader_t* h = NULL;
-    char *tmp = ResolveFile(name, &my_context->box64_ld_lib);
-    if (FileExist(tmp, IS_FILE)) {
-        FILE *f = fopen(tmp, "rb");
-        if (!f) {
-            printf_log(LOG_NONE, "Error: Cannot open %s\n", tmp);
-            return NULL;
+    const char *requested_name = strrchr(name, '/');
+
+    requested_name = requested_name ? requested_name + 1 : name;
+    for (int i = 0; i < my_context->elfsize; i++) {
+        elfheader_t *head = my_context->elfs[i];
+        const char *loaded_name;
+
+        if (!head || !head->latx_hasfix) {
+            continue;
         }
-        h = LoadAndCheckElfHeader(f, tmp, 0);
-        ElfHeadReFix(h, loadSoaddrFromMap(tmp));
-        if ((uintptr_t)h->VerSym > (uintptr_t)h->delta) {
-            h->delta = 0;
+        loaded_name = strrchr(ElfName(head), '/');
+        loaded_name = loaded_name ? loaded_name + 1 : ElfName(head);
+        if (!strcmp(loaded_name, requested_name)) {
+            return head;
         }
-    } else {
-        lsassertm(0, "cannot find %s\n", tmp);
     }
+    return NULL;
+}
+#endif
+
+elfheader_t *loadElfFromFile(const char *name)
+{
+    elfheader_t *h = NULL;
+
+#ifdef CONFIG_LATX_KZT
+    if (latx_kzt_runtime_enabled()) {
+        h = find_loaded_elf(name);
+        if (h) {
+            return h;
+        }
+    }
+#endif
+
+    char *tmp = ResolveFile(name, &my_context->box64_ld_lib);
+    if (!tmp) {
+        return NULL;
+    }
+    if (!FileExist(tmp, IS_FILE)) {
+        lsassertm(0, "cannot find %s\n", tmp);
+        box_free(tmp);
+        return NULL;
+    }
+
+    FILE *f = fopen(tmp, "rb");
+    if (!f) {
+        printf_log(LOG_NONE, "Error: Cannot open %s\n", tmp);
+        box_free(tmp);
+        return NULL;
+    }
+    h = LoadAndCheckElfHeader(f, tmp, 0);
+    if (!h) {
+        fclose(f);
+        box_free(tmp);
+        return NULL;
+    }
+    ElfHeadReFix(h, loadSoaddrFromMap(tmp));
+    if ((uintptr_t)h->VerSym > (uintptr_t)h->delta) {
+        h->delta = 0;
+    }
+    box_free(tmp);
     return h;
 }
 #pragma GCC diagnostic pop

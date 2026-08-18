@@ -31,6 +31,16 @@ if 'x86_64-linux-user' in target_dirs
       files('../../clone-parent-settid.S'),
     ],
   }]
+  if 'CONFIG_LATX_KZT' in config_host
+    latx_integration_tests += [{
+      'name': 'test-dlopen-loaded-libc-x86',
+      'runner': find_program('../../test-dlopen-loaded-libc-x86.sh'),
+      'args': [
+        emulators['latx-x86_64'],
+        files('../../dlopen-loaded-libc-x86.S'),
+      ],
+    }]
+  endif
   latx_integration_tests += [{
     'name': 'test-guest-fatal-signal-status',
     'runner': find_program('../../test-guest-fatal-signal-status.sh'),
