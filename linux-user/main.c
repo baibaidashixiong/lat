@@ -51,6 +51,9 @@
 #include "target_elf.h"
 #include "cpu_loop-common.h"
 #include "crypto/init.h"
+#if defined(CONFIG_LATX) && defined(TARGET_X86_64)
+#include "pressure-vessel.h"
+#endif
 int mydebug = 1;
 
 #ifdef CONFIG_LATX
@@ -1331,6 +1334,9 @@ int main(int argc, char **argv, char **envp)
     int log_mask;
     unsigned long max_reserved_va;
     bool preserve_argv0;
+#if defined(CONFIG_LATX) && defined(TARGET_X86_64)
+    char **pressure_vessel_payload;
+#endif
 #ifdef TARGET_I386
     int initial_guest_exe_fd = -1;
     unsigned int inherited_guest_mdwe = 0;
@@ -1504,6 +1510,11 @@ int main(int argc, char **argv, char **envp)
     /* Scan interp_prefix dir for replacement files. */
     init_paths(interp_prefix);
 
+#if defined(CONFIG_LATX) && defined(TARGET_X86_64)
+    pressure_vessel_payload =
+        latx_pressure_vessel_prepare(exec_path, target_argv, envlist);
+#endif
+
     init_qemu_uname_release();
 
     /*
@@ -1601,6 +1612,15 @@ int main(int argc, char **argv, char **envp)
 
     target_environ = envlist_to_environ(envlist, NULL);
     envlist_free(envlist);
+
+#if defined(CONFIG_LATX) && defined(TARGET_X86_64)
+    if (pressure_vessel_payload) {
+        execve(pressure_vessel_payload[0], pressure_vessel_payload,
+               target_environ);
+        error_report("cannot launch pressure-vessel payload %s: %s",
+                     pressure_vessel_payload[0], strerror(errno));
+    }
+#endif
 
 #define KERNEL_CONFIG_LSM_MMAP_MIN_ADDR 65536
     /*
