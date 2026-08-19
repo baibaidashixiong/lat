@@ -169,3 +169,25 @@ test(
   test_kzt_address_policy,
   suite: 'lat-pr-fast',
 )
+
+if 'CONFIG_LATX' in config_host
+  test_kzt_groups = executable(
+    'test-kzt-groups',
+    files(
+      'kzt/test_kzt_groups.c',
+      '../../target/i386/latx/context/kzt-groups.c',
+    ),
+    include_directories: include_directories(
+      '../..',
+      '../../target/i386/latx/include',
+    ),
+    dependencies: [glib, qemuutil],
+    build_by_default: false,
+  )
+
+  test(
+    'test-kzt-groups',
+    test_kzt_groups,
+    suite: 'lat-pr-fast',
+  )
+endif

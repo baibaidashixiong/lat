@@ -419,6 +419,16 @@ bool kzt_group_disable(KztLibraryGroup group, const char *reason)
         }
         kzt_groups_log_mask("enabled library groups", kzt_effective_groups);
     }
+
+    /*
+     * The GL group contains GLX entry points that share Display objects with
+     * libX11. Do not mix guest GL with native X11 wrappers after a GL
+     * compatibility fallback.
+     */
+    if (group == KZT_GROUP_GL) {
+        kzt_group_disable(KZT_GROUP_X11,
+                          "guest GL fallback requires guest X11 ABI");
+    }
     return true;
 }
 
