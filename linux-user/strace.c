@@ -1938,7 +1938,7 @@ print_execv(void *cpu_env, const struct syscallname *name,
 }
 #endif
 
-#ifdef TARGET_NR_faccessat
+#if defined(TARGET_NR_faccessat) || defined(TARGET_NR_faccessat2)
 static void
 print_faccessat(void *cpu_env, const struct syscallname *name,
                 abi_long arg0, abi_long arg1, abi_long arg2,
