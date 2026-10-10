@@ -29,9 +29,42 @@
 int box64_x87_no80bits = 1;
 #define BIAS80 16383
 #define BIAS64 1023
+
+/* Patch state is reusable only while the callback targets the same TB. */
+typedef struct KztGuestPcCallbackState {
+    uint32_t inst_old[2];
+    uintptr_t fixed_target;
+    unsigned int fixed_link_reg;
+    TranslationBlock *tb;
+    uint32_t flush_count;
+} KztGuestPcCallbackState;
+
 static TranslationBlock *kzt_install_guest_pc_callback(
-    uint32_t *inst_old, CPUState *cpu, uintptr_t addr,
+    KztGuestPcCallbackState *state, CPUState *cpu, uintptr_t addr,
     void (*callback)(CPUX86State *));
+
+static uintptr_t kzt_fixed_branch_target(const uint32_t *insn)
+{
+    /* Decode the destination of a LoongArch b or pcaddu18i/jirl pair. */
+    if ((insn[0] & 0xfc000000) == 0x50000000) {
+        int32_t offset = (int32_t)(insn[0] >> 10);
+
+        offset = (offset << 16) >> 16;
+        return (uintptr_t)insn + ((intptr_t)offset << 2);
+    }
+    if ((insn[0] & 0xfe000000) == 0x1e000000 &&
+        (insn[1] & 0xfc000000) == 0x4c000000) {
+        int32_t upper = (int32_t)((insn[0] >> 5) & 0xfffff);
+        int32_t lower = (int32_t)(insn[1] >> 10);
+        uintptr_t base;
+
+        upper = (upper << 12) >> 12;
+        lower = (lower << 16) >> 16;
+        base = (uintptr_t)insn + ((intptr_t)upper << 18);
+        return base + ((intptr_t)lower << 2);
+    }
+    return 0;
+}
 
 #ifndef HUGE_VAL
 #define HUGE_VAL (1.0 / 0.0)
@@ -2132,7 +2165,7 @@ static int kzt_main_relocated_before_relro;
 static int kzt_main_fallback_reported;
 static int kzt_observer_failure_reported;
 static bool kzt_header_cleanup_pending;
-static uint32 kzt_public_r_brk_inst[2];
+static KztGuestPcCallbackState kzt_public_r_brk_inst;
 extern void* x86free;
 extern void* x86realloc;
 extern void* x86pthread_setcanceltype;
@@ -2993,7 +3026,7 @@ static void test_x86free(CPUX86State *env)
         for (int i = 0; i < my_context->mallocmapsize;i++) {
             if (x86free == my_context->mallocmaps[i]->freep && i <my_context->mallocmapsize -1) {
                 struct malloc_map * m = my_context->mallocmaps[i + 1];
-                static uint32 test_ld [2] = {0};
+                static KztGuestPcCallbackState test_ld;
                 x86free = m->freep;
                 x86realloc = m->reallocp;
                 target_ulong eip = env->eip;
@@ -3009,7 +3042,7 @@ static void test_x86free(CPUX86State *env)
                 mmap_unlock();
                 printf_log(LOG_DEBUG, "%s latx try find free=%p, realloc=%p from %s\n", __func__, x86free, x86realloc, ((elfheader_t*)m->h)->path);
                 test_tb = kzt_install_guest_pc_callback(
-                    (uint32 *)&test_ld, cpu, (uintptr_t)x86free,
+                    &test_ld, cpu, (uintptr_t)x86free,
                     test_x86free);
                 env->eip = eip;
                 cnt = 0;
@@ -3031,7 +3064,7 @@ static inline gint tb_sort_cmp(const void *ap, const void *bp)
 static void finiReFlesh(elfheader_t* exech)
 {
     CPUState *cpu;
-    static uint32 test_ld [2] = {0};
+    static KztGuestPcCallbackState test_ld;
     struct malloc_map * m;
 
     if (!my_context || !my_context->mallocmapsize) {
@@ -3074,7 +3107,7 @@ static void finiReFlesh(elfheader_t* exech)
     CPUArchState *env = cpu->env_ptr;
     target_ulong eip = env->eip;
     test_tb = kzt_install_guest_pc_callback(
-        (uint32 *)&test_ld, cpu, (uintptr_t)x86free, test_x86free);
+        &test_ld, cpu, (uintptr_t)x86free, test_x86free);
     env->eip = eip;
     printf_log(LOG_DEBUG, "%s latx try find free=%p, realloc=%p from %s\n", __func__, x86free, x86realloc, ((elfheader_t*)m->h)->path);
 }
@@ -3140,7 +3173,7 @@ static void kzt_guest_main_entry_callback(CPUX86State *env)
         target_ulong eip = env->eip;
 
         kzt_install_guest_pc_callback(
-            kzt_public_r_brk_inst, cpu,
+            &kzt_public_r_brk_inst, cpu,
             kzt_public_loader_observer.r_brk_addr,
             kzt_dynamic_library_change_callback);
         env->eip = eip;
@@ -3164,7 +3197,7 @@ static void kzt_guest_main_entry_callback(CPUX86State *env)
     AddDebugInfo(LIB_EMULATED, elf_header->name, info1.start_code, info1.end_code);
 }
 static TranslationBlock *kzt_install_guest_pc_callback(
-    uint32_t *inst_old, CPUState *cpu, uintptr_t addr,
+    KztGuestPcCallbackState *state, CPUState *cpu, uintptr_t addr,
     void (*callback)(CPUX86State *))
 {
     uint32 jmpinst [2] = {0};
@@ -3184,36 +3217,90 @@ static TranslationBlock *kzt_install_guest_pc_callback(
     TranslationBlock * tb = kzt_tb_find_exp(cpu, NULL, 0, cpu->tcg_cflags);
     printf_log(LOG_DEBUG, "%s add pc = %lx jmp blok=%p tb=%p\n",
                __func__, addr, callback_context, tb);
+    pinsn = (uint32 *)tb->tc.ptr;
+    if (*pinsn == 0x50000800 && *(pinsn + 1) == 0x03400000) {
+        pos = 2;
+        pinsn += pos;
+    }
+
+    if (state->tb != tb ||
+        state->flush_count != qatomic_read(&tb_ctx.tb_flush_count)) {
+        state->tb = tb;
+        state->flush_count = qatomic_read(&tb_ctx.tb_flush_count);
+        state->inst_old[0] = 0;
+        state->inst_old[1] = 0;
+        state->fixed_target = 0;
+        state->fixed_link_reg = 0;
+    }
+
     light_tb_target_set_jmp_target(0, (uintptr_t)tb->tc.ptr,
                                    (uintptr_t)&jmpinst,
                                    (uintptr_t)callback_context);
     tmp = (uint32 *)((uintptr_t)callback_context + backlen - 4 * 4);
-    pinsn =  (uint32 *)tb->tc.ptr;
-    if (*pinsn == 0x50000800 && *(pinsn + 1) == 0x03400000) {//skip insts:--> b 8(0x8)  ;andi $r0,$r0,0x0
-        pos = 2;
-        pinsn += pos;
-    }
-    #if 0
-    case: pinsn is direct insn (e.g.: b 8)
-    #endif
-    if (((*pinsn) & 0xfc000000) == 0x50000000 ||// b
-        (((*pinsn) & 0xfe000000) == 0x1e000000 &&/* pcaddu18i */
+    if (((*pinsn) & 0xfc000000) == 0x50000000 ||
+        (((*pinsn) & 0xfe000000) == 0x1e000000 &&
         (*(pinsn + 1) & 0xfc000000) == 0x4c000000)) {
         printf_log(LOG_DEBUG,
                    "KZT guest callback has fixed return cpu=%p pid=%d\n",
                    cpu, getpid());
         isOverWrite = 1;
         lsassert(jmpinst[0] && jmpinst[1]);
+        if (!state->fixed_target) {
+            state->fixed_target = kzt_fixed_branch_target(pinsn);
+            lsassert(state->fixed_target);
+            if ((pinsn[0] & 0xfe000000) == 0x1e000000 &&
+                (pinsn[1] & 0xfc000000) == 0x4c000000) {
+                state->fixed_link_reg = pinsn[1] & 0x1f;
+            }
+        }
     }
+
+    if (isOverWrite && state->fixed_target) {
+        uint32 callback_jump[2] = { jmpinst[0], jmpinst[1] };
+        uint32 tail[4] = { 0 };
+
+        /*
+         * A fixed branch is PC-relative.  Executing a copy from the bridge
+         * tail would retarget it, so preserve its destination explicitly.
+         * pcaddi restores the original jirl link register when one is used.
+         */
+        if (state->fixed_link_reg) {
+            intptr_t delta = (uintptr_t)((uint32 *)tb->tc.ptr + 2 + pos) -
+                             (uintptr_t)tmp;
+            lsassert(delta == sextract64(delta, 0, 21));
+
+            tail[0] = 0x18000000 |
+                      ((((uint32_t)(delta >> 2)) & 0xfffff) << 5) |
+                      state->fixed_link_reg;
+            memset(&jmpinst, 0, sizeof(jmpinst));
+            light_tb_target_set_jmp_target(0, (uintptr_t)(tmp + 1),
+                                           (uintptr_t)&jmpinst,
+                                           state->fixed_target);
+            tail[1] = jmpinst[0];
+            tail[2] = jmpinst[1];
+        } else {
+            memset(&jmpinst, 0, sizeof(jmpinst));
+            light_tb_target_set_jmp_target(0, (uintptr_t)tmp,
+                                           (uintptr_t)&jmpinst,
+                                           state->fixed_target);
+            tail[0] = jmpinst[0];
+            tail[1] = jmpinst[1];
+        }
+        *((uint32 *)tb->tc.ptr + pos) = callback_jump[0];
+        *((uint32 *)tb->tc.ptr + 1 + pos) = callback_jump[1];
+        memcpy(tmp, tail, sizeof(tail));
+        return tb;
+    }
+
     if (jmpinst[1]) {//long jmp
         if (!isOverWrite) {
             *tmp = *((uint32 *)tb->tc.ptr + pos);
             *(tmp + 1) = *((uint32 *)tb->tc.ptr + 1 + pos);
-            if (!inst_old[0]) inst_old[0] = *((uint32 *)tb->tc.ptr + pos);
-            if (!inst_old[1]) inst_old[1] = *((uint32 *)tb->tc.ptr + 1 + pos);
+            state->inst_old[0] = *((uint32 *)tb->tc.ptr + pos);
+            state->inst_old[1] = *((uint32 *)tb->tc.ptr + 1 + pos);
         } else {
-            *tmp = inst_old[0];
-            *(tmp + 1) = inst_old[1];
+            *tmp = state->inst_old[0];
+            *(tmp + 1) = state->inst_old[1];
         }
         *((uint32 *)tb->tc.ptr + pos) = jmpinst[0];
        *((uint32 *)tb->tc.ptr + 1 + pos) = jmpinst[1];
@@ -3222,14 +3309,13 @@ static TranslationBlock *kzt_install_guest_pc_callback(
          *(tmp + 2) =  jmpinst[0];
          *(tmp + 3) =  jmpinst[1];
     } else {
-         if (!isOverWrite) {
+        if (!isOverWrite) {
             lsassert(*((uint32 *)tb->tc.ptr + pos));
-            *tmp = *((uint32 *)tb->tc.ptr + pos);
-             if (!inst_old[0]) inst_old[0] = *((uint32 *)tb->tc.ptr + pos);
+            state->inst_old[0] = *((uint32 *)tb->tc.ptr + pos);
         } else {
-            lsassert(inst_old[0]);
-            *tmp = inst_old[0];
+            lsassert(state->inst_old[0]);
         }
+        *tmp = state->inst_old[0];
         *((uint32 *)tb->tc.ptr + pos) = jmpinst[0];
         memset(&jmpinst, 0, sizeof(jmpinst));
         light_tb_target_set_jmp_target(0, (uintptr_t)(tmp + 1), (uintptr_t)&jmpinst, (uintptr_t)((uint32 *)tb->tc.ptr + 1 + pos));
@@ -3237,10 +3323,11 @@ static TranslationBlock *kzt_install_guest_pc_callback(
     }
     return tb;
 }
+
 void kzt_install_runtime_callbacks(CPUState *cpu, void *info)
 {
     struct image_info * execinfo = (struct image_info *)info;
-    static uint32 jmpinst_exec [2] = {0};
+    static KztGuestPcCallbackState jmpinst_exec;
     CPUArchState *env;
     target_ulong eip;
 
@@ -3251,7 +3338,7 @@ void kzt_install_runtime_callbacks(CPUState *cpu, void *info)
     eip = env->eip;
 
     kzt_public_loader_observer_reset(&kzt_public_loader_observer);
-    memset(kzt_public_r_brk_inst, 0, sizeof(kzt_public_r_brk_inst));
+    memset(&kzt_public_r_brk_inst, 0, sizeof(kzt_public_r_brk_inst));
     kzt_main_relocated_before_relro = 0;
     kzt_main_fallback_reported = 0;
     kzt_observer_failure_reported = 0;
@@ -3260,7 +3347,7 @@ void kzt_install_runtime_callbacks(CPUState *cpu, void *info)
      * The program-entry hook is version independent.  It installs the
      * public r_debug/r_brk observer after guest ld.so finishes startup.
      */
-    kzt_install_guest_pc_callback((uint32 *)&jmpinst_exec, cpu,
+    kzt_install_guest_pc_callback(&jmpinst_exec, cpu,
                                   execinfo->exec_entry,
                                   kzt_guest_main_entry_callback);
     env->eip = eip;
