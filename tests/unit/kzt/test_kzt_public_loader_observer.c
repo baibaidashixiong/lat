@@ -255,7 +255,7 @@ static void write_gnu_hash_dlopen_object(fixture_t *fixture)
         .symbol_offset = 1,
         .bloom_size = 1,
         .bucket = 1,
-        .chain = 1,
+        .chain = UINT32_C(0xf9040207),
     };
     const test_x86_64_symbol_t symbols[] = {
         { 0 },
@@ -608,6 +608,7 @@ static void test_object_relro_classification_uses_guest_memory(void)
 
 static void test_symbol_lookup_uses_live_gnu_hash_object(void)
 {
+    static const char object_name[] = "/usr/lib/libc.so.6";
     fixture_t fixture;
     visit_log_t log = { 0 };
     kzt_public_loader_observer_t observer;
@@ -622,6 +623,7 @@ static void test_symbol_lookup_uses_live_gnu_hash_object(void)
     write_debug(&fixture, KZT_LOADER_DEBUG_CONSISTENT, MAP1_ADDR);
     write_map(&fixture, MAP1_ADDR, SYMBOL_ELF_BASE, NAME1_ADDR,
               SYMBOL_DYNAMIC_ADDR, 0, 0);
+    fixture_write(&fixture, NAME1_ADDR, object_name, sizeof(object_name));
     write_gnu_hash_dlopen_object(&fixture);
     kzt_public_loader_observer_reset(&observer);
     CHECK(kzt_public_loader_observer_activate(
@@ -632,6 +634,13 @@ static void test_symbol_lookup_uses_live_gnu_hash_object(void)
               &observer, &reader, "dlopen", &symbol_addr) ==
           KZT_PUBLIC_LOADER_OK);
     CHECK(symbol_addr == SYMBOL_ELF_BASE + 0x905d0);
+    CHECK(kzt_public_loader_find_symbol_in_object(
+              &observer, &reader, "libc.so.6", "dlopen", &symbol_addr) ==
+          KZT_PUBLIC_LOADER_OK);
+    CHECK(symbol_addr == SYMBOL_ELF_BASE + 0x905d0);
+    CHECK(kzt_public_loader_find_symbol_in_object(
+              &observer, &reader, "libm.so.6", "dlopen", &symbol_addr) ==
+          KZT_PUBLIC_LOADER_NOT_FOUND);
     CHECK(kzt_public_loader_find_symbol(
               &observer, &reader, "missing", &symbol_addr) ==
           KZT_PUBLIC_LOADER_NOT_FOUND);
