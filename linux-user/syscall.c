@@ -8939,6 +8939,18 @@ static abi_long do_ioctl(int fd, int cmd, abi_ulong arg)
     int i;
     int hash = (cmd & 0xff) ^ ((cmd & 0xff00) >> 8);
 
+#if defined(TARGET_I386) && !defined(TARGET_X86_64)
+    /*
+     * The ntsync UAPI is architecture-independent and uses host-visible
+     * guest addresses directly.  Wine 11 relies on these ioctls for its
+     * in-process synchronization, including from 32-bit processes.
+     */
+    if (TARGET_IOC_TYPE(cmd) == 'N' &&
+        TARGET_IOC_NR(cmd) >= 0x80 && TARGET_IOC_NR(cmd) <= 0x8d) {
+        return get_errno(safe_ioctl(fd, cmd, arg));
+    }
+#endif
+
     ie = ioctl_entries;
     int ioctl_cache_val = ioctl_cache[hash];
     ie += ioctl_cache_val;
