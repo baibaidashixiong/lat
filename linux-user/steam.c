@@ -89,30 +89,22 @@ static void latx_steam_apply_runtime_paths(
     g_autofree char *application_paths = NULL;
     g_autofree char *library_path = NULL;
     g_autofree char *assignment = NULL;
-#if defined(CONFIG_LATX_KZT)
-    bool passthrough = option_kzt != 0;
-#else
-    bool passthrough = false;
-#endif
-
     if (!files) {
         return;
     }
 
     /*
-     * Guest translation must prefer the guest sysroot and application paths.
-     * Passthrough keeps the same ordering; enabled wrappers are selected by
-     * soname and do not depend on the guest loader's path precedence.
+     * Keep the guest sysroot and Steam Runtime ahead of the application
+     * fallback so a bundled library cannot split the Runtime dependency set.
+     * Passthrough wrappers are still selected by soname when enabled.
      */
-    if (!passthrough) {
-        application_paths = g_strdup_printf(
-            "%s%s/usr/lib64:/usr/lib",
-            app_library_path && app_library_path[0] ? app_library_path : "",
-            app_library_path && app_library_path[0] ? ":" : "");
-    } else {
-        application_paths = g_strdup(app_library_path);
-    }
+    application_paths = g_strdup("/usr/lib64:/usr/lib");
     library_path = latx_steam_runtime_make_library_path(application_paths);
+    if (library_path && app_library_path && app_library_path[0]) {
+        g_autofree char *runtime_path = g_steal_pointer(&library_path);
+
+        library_path = g_strconcat(runtime_path, ":", app_library_path, NULL);
+    }
     if (library_path) {
         assignment = g_strdup_printf("LD_LIBRARY_PATH=%s", library_path);
         (void)envlist_setenv(envlist, assignment);
@@ -442,11 +434,6 @@ void latx_steam_prepare(const char *program, char **target_argv,
     const char *basename = program ? strrchr(program, '/') : NULL;
     const char *expected_files;
     bool wrapper_name;
-#if defined(CONFIG_LATX_KZT)
-    bool passthrough = option_kzt != 0;
-#else
-    bool passthrough = false;
-#endif
 
     steam_payload = NULL;
 
@@ -455,8 +442,7 @@ void latx_steam_prepare(const char *program, char **target_argv,
     wrapper_name = !g_strcmp0(basename ? basename + 1 : program,
                               "pressure-vessel-wrap");
     latx_steam_context_configure(envlist,
-                                 wrapper_name || expected_files != NULL,
-                                 passthrough);
+                                 wrapper_name || expected_files != NULL);
 
     /* Avoid Runtime discovery for launches outside the pressure-vessel chain. */
     if (!wrapper_name && !expected_files) {

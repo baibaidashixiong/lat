@@ -11,7 +11,6 @@ static char *runtime_library_path;
 static bool runtime_active;
 static bool runtime_library_path_active;
 static bool steam_context;
-static bool steam_context_passthrough;
 
 static const char *const runtime_x86_64_dirs[] = {
     "lib/x86_64-linux-gnu",
@@ -243,15 +242,13 @@ const char *latx_steam_runtime_files(void)
     return runtime_files;
 }
 
-void latx_steam_context_configure(const envlist_t *envlist, bool in_runtime,
-                                  bool passthrough)
+void latx_steam_context_configure(const envlist_t *envlist, bool in_runtime)
 {
     const char *steam_runtime = envlist ?
         envlist_getenv(envlist, "STEAM_RUNTIME") : NULL;
 
     steam_context = in_runtime ||
                     (steam_runtime && steam_runtime[0] == '/');
-    steam_context_passthrough = passthrough;
 }
 
 bool latx_steam_context_active(void)
@@ -559,7 +556,12 @@ char *latx_steam_runtime_resolve_path(const char *name)
         return NULL;
     }
 
-    if (steam_context && !steam_context_passthrough) {
+    /*
+     * Enabled wrappers still win by soname.  For every other object, an
+     * existing guest sysroot file is the only coherent ABI-compatible
+     * implementation; falling through would select the older Runtime copy.
+     */
+    if (steam_context) {
         g_autofree char *guest_file = path_get_prefixed(name);
 
         if (g_file_test(guest_file, G_FILE_TEST_IS_REGULAR)) {
