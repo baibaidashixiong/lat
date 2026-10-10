@@ -442,6 +442,11 @@ void latx_steam_prepare(const char *program, char **target_argv,
     const char *basename = program ? strrchr(program, '/') : NULL;
     const char *expected_files;
     bool wrapper_name;
+#if defined(CONFIG_LATX_KZT)
+    bool passthrough = option_kzt != 0;
+#else
+    bool passthrough = false;
+#endif
 
     steam_payload = NULL;
 
@@ -449,6 +454,9 @@ void latx_steam_prepare(const char *program, char **target_argv,
                                     LATX_STEAM_RUNTIME_FILES_ENV);
     wrapper_name = !g_strcmp0(basename ? basename + 1 : program,
                               "pressure-vessel-wrap");
+    latx_steam_context_configure(envlist,
+                                 wrapper_name || expected_files != NULL,
+                                 passthrough);
 
     /* Avoid Runtime discovery for launches outside the pressure-vessel chain. */
     if (!wrapper_name && !expected_files) {

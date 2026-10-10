@@ -10,6 +10,8 @@ static char *runtime_files;
 static char *runtime_library_path;
 static bool runtime_active;
 static bool runtime_library_path_active;
+static bool steam_context;
+static bool steam_context_passthrough;
 
 static const char *const runtime_x86_64_dirs[] = {
     "lib/x86_64-linux-gnu",
@@ -239,6 +241,22 @@ bool latx_steam_runtime_configure(const envlist_t *envlist,
 const char *latx_steam_runtime_files(void)
 {
     return runtime_files;
+}
+
+void latx_steam_context_configure(const envlist_t *envlist, bool in_runtime,
+                                  bool passthrough)
+{
+    const char *steam_runtime = envlist ?
+        envlist_getenv(envlist, "STEAM_RUNTIME") : NULL;
+
+    steam_context = in_runtime ||
+                    (steam_runtime && steam_runtime[0] == '/');
+    steam_context_passthrough = passthrough;
+}
+
+bool latx_steam_context_active(void)
+{
+    return steam_context;
 }
 
 const char *latx_steam_runtime_library_path(void)
@@ -494,6 +512,12 @@ char *latx_steam_runtime_resolve_path(const char *name)
         const char *prefix_library_dir;
         const char *prefix_dri_dir;
     } libraries[] = {
+        { "/lib64/", runtime_x86_64_dirs,
+          G_N_ELEMENTS(runtime_x86_64_dirs), "/usr/lib64",
+          "/usr/lib64/dri" },
+        { "/usr/lib64/", runtime_x86_64_dirs,
+          G_N_ELEMENTS(runtime_x86_64_dirs), "/usr/lib64",
+          "/usr/lib64/dri" },
         { "/lib/x86_64-linux-gnu/", runtime_x86_64_dirs,
           G_N_ELEMENTS(runtime_x86_64_dirs), "/usr/lib64",
           "/usr/lib64/dri" },
@@ -506,12 +530,26 @@ char *latx_steam_runtime_resolve_path(const char *name)
         { "/usr/lib/i386-linux-gnu/", runtime_i386_dirs,
           G_N_ELEMENTS(runtime_i386_dirs), "/usr/lib",
           "/usr/lib/dri" },
+        { "/lib/", runtime_i386_dirs,
+          G_N_ELEMENTS(runtime_i386_dirs), "/usr/lib",
+          "/usr/lib/dri" },
+        { "/usr/lib/", runtime_i386_dirs,
+          G_N_ELEMENTS(runtime_i386_dirs), "/usr/lib",
+          "/usr/lib/dri" },
     };
     size_t i;
 
     if (!runtime_active || !runtime_files || !name ||
         !runtime_library_path_active) {
         return NULL;
+    }
+
+    if (steam_context && !steam_context_passthrough) {
+        g_autofree char *guest_file = path_get_prefixed(name);
+
+        if (g_file_test(guest_file, G_FILE_TEST_IS_REGULAR)) {
+            return NULL;
+        }
     }
 
     if (!strcmp(name, "/etc/ld.so.cache")) {
