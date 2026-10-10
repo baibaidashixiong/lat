@@ -7,6 +7,9 @@
 #include "qemu/steam.h"
 #include "steam.h"
 #include "elf.h"
+#if defined(CONFIG_LATX_KZT)
+#include "kzt-runtime.h"
+#endif
 
 #ifdef CONFIG_LATX
 
@@ -83,15 +86,33 @@ static void latx_steam_apply_runtime_paths(
     const char *old_xdg_data_dirs)
 {
     const char *files = latx_steam_runtime_files();
+    g_autofree char *application_paths = NULL;
     g_autofree char *library_path = NULL;
     g_autofree char *assignment = NULL;
+#if defined(CONFIG_LATX_KZT)
+    bool passthrough = option_kzt != 0;
+#else
+    bool passthrough = false;
+#endif
 
     if (!files) {
         return;
     }
 
-    library_path = latx_steam_runtime_make_library_path(
-        app_library_path);
+    /*
+     * Guest translation must prefer the guest sysroot and application paths.
+     * Passthrough keeps the same ordering; enabled wrappers are selected by
+     * soname and do not depend on the guest loader's path precedence.
+     */
+    if (!passthrough) {
+        application_paths = g_strdup_printf(
+            "%s%s/usr/lib64:/usr/lib",
+            app_library_path && app_library_path[0] ? app_library_path : "",
+            app_library_path && app_library_path[0] ? ":" : "");
+    } else {
+        application_paths = g_strdup(app_library_path);
+    }
+    library_path = latx_steam_runtime_make_library_path(application_paths);
     if (library_path) {
         assignment = g_strdup_printf("LD_LIBRARY_PATH=%s", library_path);
         (void)envlist_setenv(envlist, assignment);

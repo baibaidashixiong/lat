@@ -256,6 +256,9 @@ char *latx_steam_runtime_make_library_path(const char *suffix)
     }
 
     library_path = g_string_new(NULL);
+    if (suffix && suffix[0]) {
+        g_string_append(library_path, suffix);
+    }
     for (i = 0; i < G_N_ELEMENTS(runtime_library_dirs); i++) {
         g_autofree char *directory = g_build_filename(runtime_files,
                                                        runtime_library_dirs[i],
@@ -268,12 +271,6 @@ char *latx_steam_runtime_make_library_path(const char *suffix)
             g_string_append_c(library_path, ':');
         }
         g_string_append(library_path, directory);
-    }
-    if (suffix && suffix[0]) {
-        if (library_path->len) {
-            g_string_append_c(library_path, ':');
-        }
-        g_string_append(library_path, suffix);
     }
     if (!library_path->len) {
         g_string_free(library_path, true);
@@ -498,17 +495,17 @@ char *latx_steam_runtime_resolve_path(const char *name)
         const char *prefix_dri_dir;
     } libraries[] = {
         { "/lib/x86_64-linux-gnu/", runtime_x86_64_dirs,
-          G_N_ELEMENTS(runtime_x86_64_dirs), "/usr/lib",
-          "/usr/lib/xorg/modules/dri" },
+          G_N_ELEMENTS(runtime_x86_64_dirs), "/usr/lib64",
+          "/usr/lib64/dri" },
         { "/usr/lib/x86_64-linux-gnu/", runtime_x86_64_dirs,
-          G_N_ELEMENTS(runtime_x86_64_dirs), "/usr/lib",
-          "/usr/lib/xorg/modules/dri" },
+          G_N_ELEMENTS(runtime_x86_64_dirs), "/usr/lib64",
+          "/usr/lib64/dri" },
         { "/lib/i386-linux-gnu/", runtime_i386_dirs,
           G_N_ELEMENTS(runtime_i386_dirs), "/usr/lib",
-          "/usr/lib/xorg/modules/dri" },
+          "/usr/lib/dri" },
         { "/usr/lib/i386-linux-gnu/", runtime_i386_dirs,
           G_N_ELEMENTS(runtime_i386_dirs), "/usr/lib",
-          "/usr/lib/xorg/modules/dri" },
+          "/usr/lib/dri" },
     };
     size_t i;
 
