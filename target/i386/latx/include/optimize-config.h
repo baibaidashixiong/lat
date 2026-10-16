@@ -70,7 +70,7 @@
 #undef CONFIG_LATX_TUNNEL_LIB
 #define CONFIG_LATX_TUNNEL_LIB
 #undef CONFIG_LATX_LARGE_CC
-#define CONFIG_LATX_LARGE_CC        /* code cache > 128MB */
+/* Keep the code cache within the LoongArch direct-branch range. */
 #undef CONFIG_LATX_AOT
 #define CONFIG_LATX_AOT
 #undef CONFIG_LATX_INSTS_PATTERN
