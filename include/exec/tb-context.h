@@ -23,7 +23,7 @@
 #include "qemu/thread.h"
 #include "qemu/qht.h"
 
-#define CODE_GEN_HTABLE_BITS     20 //15
+#define CODE_GEN_HTABLE_BITS     16
 #define CODE_GEN_HTABLE_SIZE     (1 << CODE_GEN_HTABLE_BITS)
 
 typedef struct TBContext TBContext;
