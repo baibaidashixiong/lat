@@ -2447,6 +2447,16 @@ static bool def_h32(TranslationBlock *tb, IR1_INST *ir1)
             des_def_gpr(tb, ir1);
             return true;
         }
+        if (ir1_opnd_size(des_opnd) == 32) {
+            des_def_gpr(tb, ir1);
+            return true;
+        }
+        return false;
+    case WRAP(LEA):
+        if (ir1_opnd_size(des_opnd) == 32) {
+            des_def_gpr(tb, ir1);
+            return true;
+        }
         return false;
     case WRAP(MOVD):
         if (ir1_opnd_is_xmm(ir1_get_opnd(ir1, 1))) {
@@ -2667,6 +2677,28 @@ static void do_gpr_opt(TranslationBlock **tb_list, int tb_num_in_tu)
     }
     over_tb_gpr_opt(tb_list, tb_num_in_tu);
 }
+
+void hbr_local_gpr_opt(TranslationBlock *tb)
+{
+    uint32_t gpr_live = GHBR_GPR_ALL;
+
+    /* Dynamic translation reuses IR1 storage without clear_ir1_flag(). */
+    for (int i = 0; i < tb_ir1_num(tb); i++) {
+        tb_ir1_inst(tb, i)->hbr_flag &= ~GHBR_LOCAL_CAN_OPT;
+    }
+
+    get_gpr_use_def(tb);
+    for (int i = tb_ir1_num(tb) - 1; i >= 0; i--) {
+        IR1_INST *ir1 = tb_ir1_inst(tb, i);
+
+        if (ir1->gpr_def & gpr_live) {
+            gpr_live &= ~ir1->gpr_def;
+        } else if (ir1->gpr_def) {
+            ir1->hbr_flag |= GHBR_LOCAL_CAN_OPT;
+        }
+        gpr_live |= ir1->gpr_use;
+    }
+}
 #endif
 
 void hbr_opt(TranslationBlock **tb_list, int tb_num_in_tu)
@@ -2711,10 +2743,10 @@ bool can_shbr_opt32(IR1_INST *ir1)
 /* static int opt, noopt; */
 bool can_ghbr_opt(IR1_INST *ir1)
 {
-    if (!in_pre_translate) {
-        return false;
+    if (in_pre_translate && (ir1->hbr_flag & GHBR_CAN_OPT)) {
+        return true;
     }
-    if (ir1->hbr_flag & GHBR_CAN_OPT) {
+    if (ir1->hbr_flag & GHBR_LOCAL_CAN_OPT) {
         return true;
     }
     return false;

@@ -37,6 +37,7 @@ bool need_shbr_restore_zero64(IR1_INST *ir1);
 
 #ifdef TARGET_X86_64
 bool can_ghbr_opt(IR1_INST *ir1);
+void hbr_local_gpr_opt(TranslationBlock *tb);
 #define GHBR_ON(_ir1) can_ghbr_opt(_ir1)
 #else
 #define GHBR_ON(_ir1) (0)

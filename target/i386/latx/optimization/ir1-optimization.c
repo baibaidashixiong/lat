@@ -10,6 +10,7 @@
 #include "ir1-optimization.h"
 
 #include "flag-reduction.h"
+#include "hbr.h"
 #include "insts-pattern.h"
 #include "tu.h"
 
@@ -52,6 +53,9 @@ static void ir1_optimization_over_tb(TranslationBlock *tb)
         /* TODO: TU */
         OPT_INSTS_PTN(tb, ir1, i, ptn);
     }
+#if defined(TARGET_X86_64) && defined(CONFIG_LATX_HBR)
+    hbr_local_gpr_opt(tb);
+#endif
     SAVE_FLAG_TO_TB(rdtn, tb);
 }
 
@@ -166,5 +170,8 @@ void ir1_optimization(TranslationBlock *tb)
         /* TODO: TU */
         OPT_INSTS_PTN(tb, ir1, i, ptn);
     }
+#if defined(TARGET_X86_64) && defined(CONFIG_LATX_HBR)
+    hbr_local_gpr_opt(tb);
+#endif
     SAVE_FLAG_TO_TB(rdtn, tb);
 }

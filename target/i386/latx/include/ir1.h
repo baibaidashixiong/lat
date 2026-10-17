@@ -143,6 +143,7 @@ typedef struct IR1_INST {
 #define GHBR_CAN_OPT      0x08
 #define SHBR_KNOWN_ZERO64 0x10
 #define SHBR_RESTORE_ZERO64 0x20
+#define GHBR_LOCAL_CAN_OPT 0x40
     uint8_t hbr_flag;
 #endif
 #ifdef CONFIG_LATX_INSTS_PATTERN

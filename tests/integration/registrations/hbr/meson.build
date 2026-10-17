@@ -4,6 +4,7 @@ if 'x86_64-linux-user' in target_dirs
     ['hbr-edge-fixture', 'hbr-edge-fixture.c'],
     ['hbr-ghbr-div-fixture', 'hbr-ghbr-div-fixture.c'],
     ['hbr-known-zero64-fixture', 'hbr-known-zero64-fixture.c'],
+    ['hbr-local-gpr-fixture', 'hbr-local-gpr-fixture.c'],
     ['hbr-round-fixture', 'hbr-round-fixture.c'],
     ['hbr-zero-semantics-fixture', 'hbr-zero-semantics-fixture.c'],
   ]
