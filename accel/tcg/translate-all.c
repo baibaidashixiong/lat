@@ -1183,11 +1183,17 @@ static bool alloc_code_gen_buffer_anon(size_t size, int prot,
     }
     tcg_ctx->code_gen_buffer_size = size;
 
-    /* Request large pages for the buffer.  */
 #ifdef LOW_MEM_MODE_0
     qemu_madvise(buf, size, QEMU_MADV_NOHUGEPAGE);
 #else
-    qemu_madvise(buf, size, QEMU_MADV_HUGEPAGE);
+    /* Bound the per-process large-page footprint of the JIT arena.  */
+    const size_t huge_size = MIN(size, 16 * MiB);
+
+    qemu_madvise(buf, huge_size, QEMU_MADV_HUGEPAGE);
+    if (huge_size < size) {
+        qemu_madvise(buf + huge_size, size - huge_size,
+                     QEMU_MADV_NOHUGEPAGE);
+    }
 #endif
 
     tcg_ctx->code_gen_buffer = buf;
