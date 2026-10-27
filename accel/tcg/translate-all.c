@@ -1210,11 +1210,16 @@ static bool alloc_tb_gen_buffer(size_t size)
         return false;
     }
 
-    /* Request large pages for the buffer.  */
 #ifdef LOW_MEM_MODE_0
     qemu_madvise(buf, size, QEMU_MADV_NOHUGEPAGE);
 #else
-    qemu_madvise(buf, size, QEMU_MADV_HUGEPAGE);
+    const size_t huge_size = MIN(size, 16 * MiB);
+
+    qemu_madvise(buf, huge_size, QEMU_MADV_HUGEPAGE);
+    if (huge_size < size) {
+        qemu_madvise(buf + huge_size, size - huge_size,
+                     QEMU_MADV_NOHUGEPAGE);
+    }
 #endif
 
     tcg_ctx->tb_gen_buffer = buf;
