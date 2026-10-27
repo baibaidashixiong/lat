@@ -22490,6 +22490,8 @@ abi_long do_syscall_with_seccomp(void *cpu_env, int num, int seccomp_num,
     if (suppress_tunnel) {
         ret = 0;
         seccomp_action = GUEST_SECCOMP_RETURN;
+    } else if (likely(!qatomic_read(&ts->seccomp_filter))) {
+        seccomp_action = GUEST_SECCOMP_CONTINUE;
     } else {
         seccomp_action = guest_seccomp_filter_syscall(
             env, seccomp_num, seccomp_arch, seccomp_args, &ret);
