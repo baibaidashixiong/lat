@@ -1,6 +1,7 @@
 if 'x86_64-linux-user' in target_dirs
   foreach hbr_fixture : [
     ['hbr-avx-shift-fixture', 'hbr-avx-shift-fixture.c'],
+    ['hbr-cmp32-jcc-fixture', 'hbr-cmp32-jcc-fixture.c'],
     ['hbr-edge-fixture', 'hbr-edge-fixture.c'],
     ['hbr-ghbr-div-fixture', 'hbr-ghbr-div-fixture.c'],
     ['hbr-known-zero64-fixture', 'hbr-known-zero64-fixture.c'],

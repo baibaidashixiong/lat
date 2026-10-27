@@ -119,14 +119,39 @@ static inline void cmp_jcc_gen_bcc(IR2_OPND src_opnd_0, IR2_OPND src_opnd_1,
     }
 }
 
+static inline IR2_OPND cmp_jcc_calculate_word_eq(IR2_OPND src_opnd_0,
+        IR2_OPND src_opnd_1)
+{
+    IR2_OPND difference = ra_alloc_itemp();
+
+    la_sub_w(difference, src_opnd_0, src_opnd_1);
+    return difference;
+}
+
+static inline void cmp_jcc_gen_word_eq_bcc(IR2_OPND difference,
+        IR2_OPND target_label_opnd,
+        IR1_INST *jcc_inst)
+{
+    if (ir1_opcode(jcc_inst) == WRAP(JE)) {
+        la_beq(difference, zero_ir2_opnd, target_label_opnd);
+    } else {
+        lsassert(ir1_opcode(jcc_inst) == WRAP(JNE));
+        la_bne(difference, zero_ir2_opnd, target_label_opnd);
+    }
+}
+
 static bool translate_cmp_jcc(IR1_INST *ir1)
 {
     IR1_INST *curr = ir1;
     IR1_INST *next = ir1->instptn.next;
+    IR1_OPND *opnd0 = ir1_get_opnd(curr, 0);
+    bool word_equality = ir1_opnd_size(opnd0) == 32 &&
+                         (ir1_opcode(next) == WRAP(JE) ||
+                          ir1_opcode(next) == WRAP(JNE));
 
     curr->info->id = WRAP(CMP);
 
-    int em = ZERO_EXTENSION;
+    int em = word_equality ? UNKNOWN_EXTENSION : ZERO_EXTENSION;
     switch (ir1_opcode(next)) {
     case WRAP(JL):
     case WRAP(JGE):
@@ -146,6 +171,7 @@ static bool translate_cmp_jcc(IR1_INST *ir1)
     TranslationBlock *tb = lsenv->tr_data->curr_tb;
     if (judge_tu_eflag_gen(tb)) {
         IR2_OPND tu_reset_label_opnd = ra_alloc_label();
+        IR2_OPND word_difference;
         TranslationBlock *tb_next = tb->s_data->next_tb[TU_TB_INDEX_NEXT];
         TranslationBlock *tb_target = tb->s_data->next_tb[TU_TB_INDEX_TARGET];
 
@@ -153,9 +179,19 @@ static bool translate_cmp_jcc(IR1_INST *ir1)
             generate_eflag_calculation(src_opnd_0, src_opnd_0, src_opnd_1, curr, true);
         }
 
+        if (word_equality) {
+            word_difference = cmp_jcc_calculate_word_eq(src_opnd_0,
+                                                        src_opnd_1);
+        }
         la_label(tu_reset_label_opnd);
         tb->tu_jmp[TU_TB_INDEX_TARGET] = tu_reset_label_opnd._label_id;
-        cmp_jcc_gen_bcc(src_opnd_0, src_opnd_1, target_label_opnd, next);
+        if (word_equality) {
+            cmp_jcc_gen_word_eq_bcc(word_difference,
+                                    target_label_opnd, next);
+            ra_free_temp(word_difference);
+        } else {
+            cmp_jcc_gen_bcc(src_opnd_0, src_opnd_1, target_label_opnd, next);
+        }
         tu_jcc_nop_gen(tb);
 
         if (tb_next->eflag_use && !tb_target->eflag_use) {
@@ -178,7 +214,14 @@ static bool translate_cmp_jcc(IR1_INST *ir1)
     }
 #endif
 
-    cmp_jcc_gen_bcc(src_opnd_0, src_opnd_1, target_label_opnd, next);
+    if (word_equality) {
+        IR2_OPND word_difference = cmp_jcc_calculate_word_eq(src_opnd_0,
+                                                              src_opnd_1);
+        cmp_jcc_gen_word_eq_bcc(word_difference, target_label_opnd, next);
+        ra_free_temp(word_difference);
+    } else {
+        cmp_jcc_gen_bcc(src_opnd_0, src_opnd_1, target_label_opnd, next);
+    }
 
     /* not taken */
     EFLAGS_CACULATE(src_opnd_0, src_opnd_1, curr, 0, true);
