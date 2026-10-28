@@ -7,7 +7,8 @@
 #ifndef LATX_IR1_DECODE_H
 #define LATX_IR1_DECODE_H
 
-#define IR1_DECODE_TEMPLATE_CACHE_SIZE 16384
+#define IR1_DECODE_TEMPLATE_CACHE_SIZE 512
+#define IR1_DECODE_TEMPLATE_INITIAL_SIZE 64
 
 /*
  * Translation decodes repeated position-independent instruction encodings.
@@ -23,6 +24,8 @@ typedef struct Ir1DecodeTemplate {
 
 static __thread Ir1DecodeTemplate *ir1_decode_templates;
 static __thread uint8_t *ir1_decode_template_valid;
+static __thread size_t ir1_decode_template_capacity;
+static __thread size_t ir1_decode_template_used;
 static GPrivate ir1_decode_templates_owner = G_PRIVATE_INIT(g_free);
 static GPrivate ir1_decode_template_valid_owner = G_PRIVATE_INIT(g_free);
 
@@ -33,7 +36,7 @@ static uint32_t ir1_decode_template_hash(const uint8_t *code, size_t size,
     for (size_t i = 0; i < size; i++) {
         hash = (hash ^ code[i]) * 16777619u;
     }
-    return hash & (IR1_DECODE_TEMPLATE_CACHE_SIZE - 1);
+    return hash;
 }
 
 static struct la_dt_insn *ir1_decode_template_output(int ir1_num,
@@ -41,6 +44,44 @@ static struct la_dt_insn *ir1_decode_template_output(int ir1_num,
 {
     return (void *)((uintptr_t)pir1_base +
                     ir1_num * sizeof(struct la_dt_insn));
+}
+
+static void ir1_decode_template_allocate(size_t capacity)
+{
+    ir1_decode_templates = g_new(Ir1DecodeTemplate, capacity);
+    ir1_decode_template_valid = g_new0(uint8_t, capacity);
+    ir1_decode_template_capacity = capacity;
+    ir1_decode_template_used = 0;
+    g_private_set(&ir1_decode_templates_owner, ir1_decode_templates);
+    g_private_set(&ir1_decode_template_valid_owner,
+                  ir1_decode_template_valid);
+}
+
+static void ir1_decode_template_grow(void)
+{
+    Ir1DecodeTemplate *old_templates = ir1_decode_templates;
+    uint8_t *old_valid = ir1_decode_template_valid;
+    size_t old_capacity = ir1_decode_template_capacity;
+    size_t new_capacity = MIN(old_capacity * 2,
+                              (size_t)IR1_DECODE_TEMPLATE_CACHE_SIZE);
+    size_t old_used = ir1_decode_template_used;
+
+    ir1_decode_template_allocate(new_capacity);
+    for (size_t i = 0; i < old_capacity; i++) {
+        if (!old_valid[i]) {
+            continue;
+        }
+        Ir1DecodeTemplate *old = &old_templates[i];
+        size_t prefix_size = MIN((size_t)old->size, 4);
+        size_t index = ir1_decode_template_hash(
+            old->bytes, prefix_size, old->mode) &
+            (ir1_decode_template_capacity - 1);
+        ir1_decode_templates[index] = *old;
+        ir1_decode_template_valid[index] = true;
+    }
+    ir1_decode_template_used = old_used;
+    g_free(old_valid);
+    g_free(old_templates);
 }
 
 /*
@@ -405,7 +446,8 @@ static struct la_dt_insn *ir1_decode_template_lookup(const uint8_t *code,
     }
     size_t prefixes = MIN(code_size, 4);
     for (size_t size = 1; size <= prefixes; size++) {
-        size_t index = ir1_decode_template_hash(code, size, mode);
+        size_t index = ir1_decode_template_hash(code, size, mode) &
+                       (ir1_decode_template_capacity - 1);
         Ir1DecodeTemplate *entry = &ir1_decode_templates[index];
         if (ir1_decode_template_valid[index] && entry->mode == mode &&
             entry->size <= code_size &&
@@ -444,17 +486,20 @@ static void ir1_decode_template_insert(const uint8_t *code, size_t code_size,
         return;
     }
     if (!ir1_decode_templates) {
-        ir1_decode_templates = g_new(Ir1DecodeTemplate,
-                                     IR1_DECODE_TEMPLATE_CACHE_SIZE);
-        ir1_decode_template_valid = g_new0(uint8_t,
-                                           IR1_DECODE_TEMPLATE_CACHE_SIZE);
-        g_private_set(&ir1_decode_templates_owner, ir1_decode_templates);
-        g_private_set(&ir1_decode_template_valid_owner,
-                      ir1_decode_template_valid);
+        ir1_decode_template_allocate(IR1_DECODE_TEMPLATE_INITIAL_SIZE);
+    } else if (ir1_decode_template_capacity <
+                   IR1_DECODE_TEMPLATE_CACHE_SIZE &&
+               (ir1_decode_template_used + 1) * 4 >=
+                   ir1_decode_template_capacity * 3) {
+        ir1_decode_template_grow();
     }
     size_t prefix_size = MIN((size_t)info->size, 4);
-    size_t index = ir1_decode_template_hash(code, prefix_size, mode);
+    size_t index = ir1_decode_template_hash(code, prefix_size, mode) &
+                   (ir1_decode_template_capacity - 1);
     Ir1DecodeTemplate *entry = &ir1_decode_templates[index];
+    if (!ir1_decode_template_valid[index]) {
+        ir1_decode_template_used++;
+    }
     entry->mode = mode;
     entry->size = info->size;
     memcpy(entry->bytes, code, info->size);

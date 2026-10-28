@@ -135,6 +135,38 @@ static void test_modes(void)
     }
 }
 
+static void reset_decode_cache(void)
+{
+    g_private_set(&ir1_decode_templates_owner, NULL);
+    g_private_set(&ir1_decode_template_valid_owner, NULL);
+    g_free(ir1_decode_templates);
+    g_free(ir1_decode_template_valid);
+    ir1_decode_templates = NULL;
+    ir1_decode_template_valid = NULL;
+    ir1_decode_template_capacity = 0;
+    ir1_decode_template_used = 0;
+}
+
+static void test_growth(void)
+{
+    struct la_dt_insn info = { 0 }, output = { 0 };
+    uint8_t code[15] = { 0 };
+
+    reset_decode_cache();
+    info.size = 1;
+    for (unsigned int i = 0; i < 200; i++) {
+        code[0] = i;
+        ir1_decode_template_insert(code, sizeof(code), 1, &info);
+    }
+
+    g_assert_cmpuint(ir1_decode_template_capacity, ==,
+                     IR1_DECODE_TEMPLATE_CACHE_SIZE);
+    g_assert_cmpuint(ir1_decode_template_used, >, 191);
+    code[0] = 0;
+    g_assert_nonnull(ir1_decode_template_lookup(code, sizeof(code), 0x2000,
+                                                0, &output, 1));
+}
+
 static void test_collision(void)
 {
     uint8_t a[15] = { 0x0f, 0x1f, 0x84, 0, 0x11, 0x22, 0x33, 0x44 };
@@ -231,6 +263,7 @@ int main(void)
     test_cache();
     test_collision();
     test_modes();
+    test_growth();
     test_threads();
     g_assert_cmpuint(checked, >, 250000);
     printf("fast decoder checked=%u field mismatches=%u\n", checked, failures);
