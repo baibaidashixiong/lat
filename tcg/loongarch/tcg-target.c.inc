@@ -1806,7 +1806,7 @@ static void tcg_target_qemu_prologue(TCGContext *s)
     s->code_ptr += inst_nr;
 #if defined(CONFIG_LATX_TBMINI_ENABLE)
     if (option_split_tb) {
-        s->code_ptr += qemu_icache_linesize / 4;
+        s->code_ptr += CODE_GEN_ALIGN / 4;
     }
 #endif
 

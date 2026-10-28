@@ -690,6 +690,21 @@ static void *query_tu_tbm_table(TBMini *tbm, uintptr_t tc_ptr)
 }
 #endif
 
+static bool tcg_tbmini_valid_tb(void *tb, uintptr_t tc_ptr)
+{
+    TranslationBlock *candidate = tb;
+    uintptr_t tb_addr = (uintptr_t)tb;
+    uintptr_t tb_start = (uintptr_t)tcg_ctx->tb_gen_buffer;
+    uintptr_t tb_end = (uintptr_t)tcg_ctx->tb_gen_ptr;
+
+    return tb &&
+        QEMU_IS_ALIGNED(tb_addr, qemu_icache_linesize) &&
+        (!option_split_tb || (tb_addr >= tb_start && tb_addr < tb_end)) &&
+        (option_split_tb || in_code_gen_buffer(tb)) &&
+        tc_ptr >= (uintptr_t)candidate->tc.ptr &&
+        tc_ptr < (uintptr_t)candidate->tc.ptr + candidate->tc.size;
+}
+
 static void *tcg_tb_lookup_fast(uintptr_t tc_ptr)
 {
     if (!in_code_gen_buffer((void *)tc_ptr)) {
@@ -697,20 +712,24 @@ static void *tcg_tb_lookup_fast(uintptr_t tc_ptr)
     }
     TBMini *tbm = (TBMini *)(ROUND_DOWN((uintptr_t)tc_ptr - 4,
                 CODE_GEN_ALIGN));
-    while (tbm->mtbp_struct.magic != TB_MAGIC) {
+    for (;;) {
+        if (tbm->mtbp_struct.magic == TB_MAGIC) {
+            void *tb = (void *)(tbm->mtbp_uint64 &
+                        MAKE_64BIT_MASK(0, HOST_VIRT_ADDR_SPACE_BITS));
+#ifdef CONFIG_LATX_TU
+            if ((uintptr_t)tb <= MAX_TBM_TABLE_LEN) {
+                tb = query_tu_tbm_table(tbm, tc_ptr);
+            }
+#endif
+            if (tcg_tbmini_valid_tb(tb, tc_ptr)) {
+                return tb;
+            }
+        }
         tbm = (TBMini *)((uint64_t)tbm - CODE_GEN_ALIGN);
         if (!in_code_gen_buffer((void *)tbm)) {
             return NULL;
         }
     }
-    void *tb = (void *)(tbm->mtbp_uint64 &
-                MAKE_64BIT_MASK(0, HOST_VIRT_ADDR_SPACE_BITS));
-#ifdef CONFIG_LATX_TU
-    if ((uintptr_t)tb <= MAX_TBM_TABLE_LEN) {
-        tb = query_tu_tbm_table(tbm, tc_ptr);
-    }
-#endif
-    return tb;
 }
 
 TranslationBlock *tcg_tb_lookup(uintptr_t tc_ptr)
@@ -765,7 +784,7 @@ static void tcg_region_assign(TCGContext *s, size_t curr_region)
 #if defined(CONFIG_LATX_TBMINI_ENABLE)
     /* leave space for TBMini for the 1st TB */
     if (option_split_tb) {
-        s->code_gen_ptr += qemu_icache_linesize;
+        s->code_gen_ptr += CODE_GEN_ALIGN;
     }
 #endif
 }
@@ -1289,7 +1308,7 @@ TranslationBlock *tcg_tb_alloc(TCGContext *s)
             goto retry;
         }
         qatomic_set(&s->tb_gen_ptr, next_tb);
-        next = (void *)ROUND_UP((uintptr_t)s->code_gen_ptr, align);
+        next = (void *)ROUND_UP((uintptr_t)s->code_gen_ptr, CODE_GEN_ALIGN);
     } else {
         tb = (void *)ROUND_UP((uintptr_t)s->code_gen_ptr, align);
         next = (void *)ROUND_UP((uintptr_t)(tb + 1), align);
@@ -1324,7 +1343,7 @@ TranslationBlock *tcg_tb_alloc_full(TCGContext *s)
             goto retry;
         }
         qatomic_set(&s->tb_gen_ptr, next_tb);
-        next = (void *)ROUND_UP((uintptr_t)s->code_gen_ptr, align);
+        next = (void *)ROUND_UP((uintptr_t)s->code_gen_ptr, CODE_GEN_ALIGN);
     } else {
         tb = (void *)ROUND_UP((uintptr_t)s->code_gen_ptr, align);
         new_s_data = (void *)ROUND_UP((uintptr_t)(tb + 1), align);

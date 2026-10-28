@@ -1983,7 +1983,8 @@ TranslationBlock *tb_gen_code(CPUState *cpu,
     /* set TBMini */
     uint64_t *tbm = (uint64_t *)gen_code_buf;
     tbmini_set_pointer(tbm, (uint64_t)tb);
-    gen_code_buf = (tcg_insn_unit *)(ROUND_UP((uintptr_t)gen_code_buf + sizeof(struct TBMini), qemu_icache_linesize));
+    gen_code_buf = (tcg_insn_unit *)(ROUND_UP(
+        (uintptr_t)gen_code_buf + sizeof(struct TBMini), CODE_GEN_ALIGN));
 #endif
 
     tb->tc.ptr = tcg_splitwx_to_rx(gen_code_buf);
