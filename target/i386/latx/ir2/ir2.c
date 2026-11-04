@@ -312,9 +312,6 @@ inline __attribute__ ((always_inline))
 int ir2_get_id(const IR2_INST *ir2) { return ir2->_id; }
 
 inline __attribute__ ((always_inline))
-IR2_OPCODE ir2_opcode(const IR2_INST *ir2) { return (IR2_OPCODE)(ir2->_opcode); }
-
-inline __attribute__ ((always_inline))
 void ir2_set_opcode(IR2_INST *ir2, IR2_OPCODE type) {
     ir2->_opcode = type;
 }
@@ -325,15 +322,6 @@ IR2_INST *ir2_prev(const IR2_INST *ir2)
         return NULL;
     } else {
         return lsenv->tr_data->ir2_inst_array + ir2->_prev;
-    }
-}
-
-IR2_INST *ir2_next(const IR2_INST *ir2)
-{
-    if (ir2->_next == -1) {
-        return NULL;
-    } else {
-        return lsenv->tr_data->ir2_inst_array + ir2->_next;
     }
 }
 

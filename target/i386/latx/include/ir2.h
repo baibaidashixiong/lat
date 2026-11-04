@@ -63,15 +63,18 @@ void ir2_build(IR2_INST *, IR2_OPCODE, IR2_OPND, IR2_OPND, IR2_OPND);
 
 void ir2_set_id(IR2_INST *, int);
 int ir2_get_id(const IR2_INST *);
-IR2_OPCODE ir2_opcode(const IR2_INST *);
 void ir2_set_opcode(IR2_INST *ir2, IR2_OPCODE type);
 int ir2_dump(const IR2_INST *, bool);
 void ir2_dump_init(void);
 int ir2_to_string(const IR2_INST *, char *);
 IR2_INST *ir2_prev(const IR2_INST *);
-IR2_INST *ir2_next(const IR2_INST *);
 void la_disasm(uint32_t insn);
 IR2_OPCODE la_decode(uint32_t insn);
+
+static inline IR2_OPCODE ir2_opcode(const IR2_INST *ir2)
+{
+    return (IR2_OPCODE)ir2->_opcode;
+}
 
 void ir2_append(IR2_INST *);
 void ir2_remove(int id);

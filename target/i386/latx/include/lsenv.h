@@ -11,6 +11,15 @@
 #include "qemu-def.h"
 
 extern __thread ENV *lsenv;
+
+static inline IR2_INST *ir2_next(const IR2_INST *ir2)
+{
+    if (ir2->_next == -1) {
+        return NULL;
+    }
+    return lsenv->tr_data->ir2_inst_array + ir2->_next;
+}
+
 #define CODEIS64 (((CPUX86State *)lsenv->cpu_state)->sys.codemode)
 //#define CODEIS64 (assert(((CPUX86State *)lsenv->cpu_state)->sys.codemode),1)
 #define LATX_DT_X86    0
