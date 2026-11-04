@@ -339,23 +339,24 @@ ADDRX ir1_disasm(IR1_INST *ir1, uint8_t *addr, ADDRX t_pc, int ir1_num,
 {
     struct la_dt_insn *info;
     bool original_code = true;
-    uint8_t nop[15] = { 0x0f, 0x1f, 0x40, 0 };
-    uint8_t nop_5[15] = { 0x0f, 0x1f, 0x44, 0, 0 };
+    static const uint8_t nop[15] = { 0x0f, 0x1f, 0x40, 0 };
+    static const uint8_t nop_5[15] = { 0x0f, 0x1f, 0x44, 0, 0 };
+    const uint8_t *decode_addr = addr;
     if (((*((uint32_t *)addr)) & 0xf8ffffff) == 0xc81e0ff3) {
         //repleace endbr32/rdsspd with 4 bytes nop, just a temporary solution
-        addr = nop;
+        decode_addr = nop;
         original_code = false;
     }
 
     if (((*((uint64_t *)addr)) & 0xfffffaff) == 0x1e0f48f3) {
         /* repleace rdsspq with 5 bytes nop, just a temporary solution */
-        addr = nop_5;
+        decode_addr = nop_5;
         original_code = false;
     }
 #ifdef CONFIG_LATX_AVX_OPT
     if (((*((uint64_t *)addr)) & 0xfffffaff) == 0xae0f48f3) {
         /* repleace incsspq with 5 bytes nop, just a temporary solution */
-        addr = nop_5;
+        decode_addr = nop_5;
         original_code = false;
     }
 #endif
@@ -364,14 +365,14 @@ ADDRX ir1_disasm(IR1_INST *ir1, uint8_t *addr, ADDRX t_pc, int ir1_num,
      * for now there are some problems if we change it. It will be settled later.
      */
     info = original_code ? ir1_hot_decode(
-        addr, t_pc, ir1_num, pir1_base, CODEIS64) : NULL;
+        decode_addr, t_pc, ir1_num, pir1_base, CODEIS64) : NULL;
     bool hot_hit = info != NULL;
     if (!hot_hit && original_code) {
-        info = ir1_decode_template_lookup(addr, 15, t_pc, ir1_num,
+        info = ir1_decode_template_lookup(decode_addr, 15, t_pc, ir1_num,
                                           pir1_base, CODEIS64);
     }
     bool template_hit = !hot_hit && info != NULL;
-    int count = info ? 1 : la_disa_v1(addr, 15, (uint64_t)t_pc,
+    int count = info ? 1 : la_disa_v1(decode_addr, 15, (uint64_t)t_pc,
         1, &info, ir1_num, pir1_base, CODEIS64);
 
     ir1->info = info;
@@ -386,7 +387,9 @@ ADDRX ir1_disasm(IR1_INST *ir1, uint8_t *addr, ADDRX t_pc, int ir1_num,
         exit(-1);
     }
 
-    disassemble_trace_cmp(addr, 15, (uint64_t)t_pc, 1, info, CODEIS64);
+#if defined(CONFIG_LATX_DEBUG) || defined(CONFIG_DEBUG_TCG)
+    disassemble_trace_cmp(decode_addr, 15, (uint64_t)t_pc, 1, info, CODEIS64);
+#endif
 
     ir1->_eflag = 0;
 
