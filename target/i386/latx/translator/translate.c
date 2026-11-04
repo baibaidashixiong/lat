@@ -566,9 +566,11 @@ int tr_ir2_assemble(const void *code_start_addr, const IR2_INST *pir2)
 #endif
 
     while (pir2 != NULL) {
-#if defined(CONFIG_LATX_PROFILER) && defined(CONFIG_LATX_DEBUG)
+#ifdef CONFIG_LATX_PROFILER
         if (ir2_opcode(pir2) == LISA_PROFILE) {
+#ifdef CONFIG_LATX_DEBUG
             ir2_id++;
+#endif
             pir2 = ir2_next(pir2);
             continue;
         } else

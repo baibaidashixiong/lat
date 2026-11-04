@@ -244,6 +244,15 @@ extern unsigned long long counter_mips_tr;
 #define ENVSUP_DEBUG
 #endif
 
+#if defined(CONFIG_PROFILER) && !defined(CONFIG_LATX_DEBUG) && \
+    !defined(CONFIG_DEBUG_TCG)
+#define ENVSUP_PROFILER \
+    ENVFUN(LAT_LOG, handle_arg_log) \
+    ENVFUN(LAT_LOG_FILENAME, handle_arg_log_filename)
+#else
+#define ENVSUP_PROFILER
+#endif
+
 #if (defined(CONFIG_LATX_DEBUG) || defined(CONFIG_DEBUG_TCG)) && defined(CONFIG_LATX)
 #define ENVSUP_LATX_DEBUG \
     ENVFUN(LATX_BEGIN_TRACE, handle_range_trace_begin) \
@@ -274,6 +283,7 @@ extern unsigned long long counter_mips_tr;
     ENVSUP_AOT \
     ENVSUP_RUNTIME \
     ENVSUP_DEBUG \
+    ENVSUP_PROFILER \
     ENVSUP_LATX_DEBUG \
     ENVSUP_PLUGIN
 
