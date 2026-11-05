@@ -9,6 +9,7 @@
 
 #include "common.h"
 #include "la-ir2.h"
+#include "reg-map.h"
 
 #define IR2_ITEMP_MAX 32
 
@@ -36,14 +37,24 @@ int ir2_opnd_is_ireg(const IR2_OPND *);
 int ir2_opnd_is_freg(const IR2_OPND *);
 int ir2_opnd_is_creg(const IR2_OPND *);
 int ir2_opnd_is_none(const IR2_OPND *);
-int ir2_opnd_is_itemp(const IR2_OPND *);
-int ir2_opnd_is_ftemp(const IR2_OPND *);
 int ir2_opnd_is_imm_reg(const IR2_OPND *);
 int ir2_opnd_is_mem(const IR2_OPND *);
 int ir2_opnd_is_imm(const IR2_OPND *);
 int ir2_opnd_is_label(const IR2_OPND *);
 int ir2_opnd_is_pseudo(const IR2_OPND *);
 int ir2_opnd_is_data(const IR2_OPND *);
+
+static inline int ir2_opnd_is_itemp(const IR2_OPND *opnd)
+{
+    return opnd->_type == IR2_OPND_GPR &&
+           reg_itemp_reverse_map[opnd->_reg_num] >= 0;
+}
+
+static inline int ir2_opnd_is_ftemp(const IR2_OPND *opnd)
+{
+    return opnd->_type == IR2_OPND_FPR &&
+           reg_ftemp_reverse_map[opnd->_reg_num] >= 0;
+}
 
 
 int ir2_opnd_to_string(const IR2_OPND *, char *, bool);
@@ -84,13 +95,35 @@ IR2_INST *ir2_allocate(void);
 
 uint32 ir2_assemble(const IR2_INST *);
 
-bool ir2_opcode_is_branch(IR2_OPCODE);
-bool ir2_opcode_is_branch_with_3opnds(IR2_OPCODE);
-bool ir2_opcode_is_branch_with_2opnds(IR2_OPCODE);
-bool ir2_opcode_is_f_branch(IR2_OPCODE opcode);
 bool ir2_opcode_is_convert(IR2_OPCODE opcode);
 bool ir2_opcode_is_fcmp(IR2_OPCODE opcode);
-bool ir2_opcode_is_jirl(IR2_OPCODE opcode);
+
+static inline bool ir2_opcode_is_branch(IR2_OPCODE opcode)
+{
+    return (opcode >= LISA_BEQZ && opcode <= LISA_BCNEZ) ||
+           (opcode >= LISA_B && opcode <= LISA_BGEU) ||
+           opcode == LISA_FAR_JUMP;
+}
+
+static inline bool ir2_opcode_is_jirl(IR2_OPCODE opcode)
+{
+    return opcode >= LISA_JISCR0 && opcode <= LISA_JIRL;
+}
+
+static inline bool ir2_opcode_is_branch_with_3opnds(IR2_OPCODE opcode)
+{
+    return opcode >= LISA_BEQ && opcode <= LISA_BGEU;
+}
+
+static inline bool ir2_opcode_is_branch_with_2opnds(IR2_OPCODE opcode)
+{
+    return opcode == LISA_BEQZ || opcode == LISA_BNEZ;
+}
+
+static inline bool ir2_opcode_is_f_branch(IR2_OPCODE opcode)
+{
+    return opcode == LISA_BCEQZ || opcode == LISA_BCNEZ;
+}
 
 IR2_OPND create_ir2_opnd(IR2_OPND_TYPE type, uint32 val);
 IR2_OPND create_immh_opnd(int val);

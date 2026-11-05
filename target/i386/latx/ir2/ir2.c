@@ -131,18 +131,6 @@ int ir2_opnd_is_none(const IR2_OPND *opnd) { return opnd->_type == IR2_OPND_NONE
 inline __attribute__ ((always_inline))
 int32 ir2_opnd_label_id(const IR2_OPND *opnd) { return opnd->_label_id; }
 
-int ir2_opnd_is_itemp(const IR2_OPND *opnd)
-{
-    return (ir2_opnd_is_ireg(opnd) &&
-           (reg_itemp_reverse_map[ir2_opnd_base_reg_num(opnd)] >= 0));
-}
-
-int ir2_opnd_is_ftemp(const IR2_OPND *opnd)
-{
-    return (ir2_opnd_is_freg(opnd) &&
-           (reg_ftemp_reverse_map[ir2_opnd_base_reg_num(opnd)] >= 0));
-}
-
 int ir2_opnd_is_imm_reg(const IR2_OPND *opnd)
 {
 #ifdef CONFIG_LATX_IMM_REG
@@ -247,37 +235,6 @@ int ir2_opnd_to_string(const IR2_OPND *opnd, char *str, bool hex)
         lsassertm(0, "type = %d\n", ir2_opnd_type(opnd));
         return 0;
     }
-}
-
-bool ir2_opcode_is_branch(IR2_OPCODE opcode)
-{
-    return (opcode >= LISA_BEQZ && opcode <= LISA_BCNEZ) ||
-           (opcode >= LISA_B && opcode <= LISA_BGEU) || opcode == LISA_FAR_JUMP;
-}
-
-bool ir2_opcode_is_jirl(IR2_OPCODE opcode)
-{
-    return LISA_JISCR0 <= opcode && opcode <= LISA_JIRL;
-}
-
-bool ir2_opcode_is_branch_with_3opnds(IR2_OPCODE opcode)
-{
-    if (opcode >= LISA_BEQ && opcode <= LISA_BGEU) {
-        return true;
-    }
-    return false;
-}
-
-inline __attribute__ ((always_inline))
-bool ir2_opcode_is_branch_with_2opnds(IR2_OPCODE opcode)
-{
-    return (opcode == LISA_BEQZ || opcode == LISA_BNEZ);
-}
-
-inline __attribute__ ((always_inline))
-bool ir2_opcode_is_f_branch(IR2_OPCODE opcode)
-{
-    return (opcode == LISA_BCEQZ || opcode == LISA_BCNEZ);
 }
 
 bool ir2_opcode_is_convert(IR2_OPCODE opcode)
