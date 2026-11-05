@@ -690,7 +690,8 @@ static void *query_tu_tbm_table(TBMini *tbm, uintptr_t tc_ptr)
 }
 #endif
 
-static bool tcg_tbmini_valid_tb(void *tb, uintptr_t tc_ptr)
+static bool tcg_tbmini_valid_tb(TBMini *tbm, void *tb, uintptr_t tc_ptr,
+                                bool tu_table)
 {
     TranslationBlock *candidate = tb;
     uintptr_t tb_addr = (uintptr_t)tb;
@@ -701,6 +702,9 @@ static bool tcg_tbmini_valid_tb(void *tb, uintptr_t tc_ptr)
         QEMU_IS_ALIGNED(tb_addr, qemu_icache_linesize) &&
         (!option_split_tb || (tb_addr >= tb_start && tb_addr < tb_end)) &&
         (option_split_tb || in_code_gen_buffer(tb)) &&
+        (tu_table || (uintptr_t)candidate->tc.ptr ==
+            ROUND_UP((uintptr_t)tbm + sizeof(struct TBMini),
+                     qemu_icache_linesize)) &&
         tc_ptr >= (uintptr_t)candidate->tc.ptr &&
         tc_ptr < (uintptr_t)candidate->tc.ptr + candidate->tc.size;
 }
@@ -716,12 +720,14 @@ static void *tcg_tb_lookup_fast(uintptr_t tc_ptr)
         if (tbm->mtbp_struct.magic == TB_MAGIC) {
             void *tb = (void *)(tbm->mtbp_uint64 &
                         MAKE_64BIT_MASK(0, HOST_VIRT_ADDR_SPACE_BITS));
+            bool tu_table = false;
 #ifdef CONFIG_LATX_TU
             if ((uintptr_t)tb <= MAX_TBM_TABLE_LEN) {
                 tb = query_tu_tbm_table(tbm, tc_ptr);
+                tu_table = true;
             }
 #endif
-            if (tcg_tbmini_valid_tb(tb, tc_ptr)) {
+            if (tcg_tbmini_valid_tb(tbm, tb, tc_ptr, tu_table)) {
                 return tb;
             }
         }
