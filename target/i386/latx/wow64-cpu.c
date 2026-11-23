@@ -148,6 +148,14 @@ static void thread_exit(void)
     }
 }
 
+__declspec(dllexport) NTSTATUS WINAPI BTCpuResetToConsistentState(EXCEPTION_POINTERS *ptrs)
+{
+    /* Unix guest exceptions already carry the translator context.  Native Wine
+     * exceptions need a non-NULL backend entry point but no host-state rewrite. */
+    (void)ptrs;
+    return STATUS_SUCCESS;
+}
+
 #else
 static void thread_exit(void)
 {
