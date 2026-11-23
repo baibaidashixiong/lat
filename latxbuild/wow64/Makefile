@@ -5,14 +5,14 @@ LATX := target/i386/latx
 HERE := $(CURDIR)
 
 OUT ?= $(ROOT)/build-wowlatx
-WINCC ?= loong64-w64-mingw32-clang
+WINCC ?= loongarch64-w64-mingw32-clang
 PYTHON ?= python3
 MESON ?= meson
 NINJA ?= ninja
 WINE_PE_BUILD ?= $(WINE_SRC)
 LATX_UNIX_BUILD ?= $(OUT)
 PREFIX ?= /usr/local
-WINE_PE_DIR ?= $(PREFIX)/lib/wine/loong64-windows
+WINE_PE_DIR ?= $(PREFIX)/lib/wine/loongarch64-windows
 WINE_UNIX_DIR ?= $(PREFIX)/lib/wine/loongarch64-unix
 
 ifeq ($(strip $(WINE_SRC)),)
@@ -27,12 +27,13 @@ GLIB_COPY := $(OUT)/glib-source
 GLIB_BUILD := $(OUT)/glib
 GLIB_LIB := $(GLIB_BUILD)/glib/libglib-2.0.a
 INTL_LIB := $(GLIB_BUILD)/subprojects/proxy-libintl-c03e1a74b17fa7ec467e110130775409e4828a4c/libintl.a
-CROSS := $(OUT)/loong64-windows.ini
+CROSS := $(OUT)/loongarch64-windows.ini
 
-PE_IMPORTS := $(WINE_PE_BUILD)/dlls/ntdll/loong64-windows/libntdll.a \
-              $(WINE_PE_BUILD)/dlls/wow64/loong64-windows/libwow64.a
+PE_IMPORTS := $(WINE_PE_BUILD)/dlls/ntdll/loongarch64-windows/libntdll.a \
+              $(WINE_PE_BUILD)/dlls/wow64/loongarch64-windows/libwow64.a
 WINEBUILD := $(WINE_PE_BUILD)/tools/winebuild/winebuild
 WINE_INCLUDES := -I$(WINE_SRC)/include -I$(ROOT)/include
+PE_INCLUDES := $(WINE_INCLUDES) -I$(WINE_SRC)/include/msvcrt
 
 # This profile uses the same translator sources as the Linux build. The
 # translator directory contains only the common instruction generators.
@@ -99,12 +100,12 @@ $(OUT)/wowlatx.dll: $(CPU_OBJ) $(CORE_OBJS) $(CAPSTONE_OBJS) $(GLIB_BUILD)/.buil
 
 $(CPU_OBJ): $(ROOT)/$(LATX)/wow64-cpu.c $(CROSS)
 	@mkdir -p "$(@D)"
-	$(WINCC) $(PE_CFLAGS) $(WINE_INCLUDES) -MMD -MP -c "$<" -o "$@"
+	$(WINCC) $(PE_CFLAGS) $(PE_INCLUDES) -MMD -MP -c "$<" -o "$@"
 
 $(OUT)/wowlatx-unix.dll: $(ROOT)/$(LATX)/wow64-cpu.c $(HERE)/Makefile $(HERE)/config-host.h $(PE_IMPORTS) $(WINEBUILD)
 	@mkdir -p "$(@D)"
 	$(WINCC) -fsyntax-only -include "$(HERE)/config-host.h" -x c /dev/null
-	$(WINCC) -O2 -ffunction-sections -fdata-sections $(WINE_INCLUDES) -D__WINESRC__ -DLATX_CPU_UNIX \
+	$(WINCC) -O2 -ffunction-sections -fdata-sections $(PE_INCLUDES) -D__WINESRC__ -DLATX_CPU_UNIX \
 	    $(PE_LDFLAGS) -nostdlib -Wl,--entry,DllMain -MMD -MP -MF "$@.d" \
 	    -o "$@" "$<" $(PE_IMPORTS) -lmsvcrt
 	"$(WINEBUILD)" --builtin "$@"
